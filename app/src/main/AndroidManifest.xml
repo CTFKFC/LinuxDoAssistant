@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- 访问 linux.do 与 DoH 服务器 -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- 前台服务：脚本要长时间运行，必须保活 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission
+        android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"
+        tools:targetApi="34" />
+
+    <!-- 通知：API 33+ 需要运行时申请 -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- 悬浮窗：小白点 + 承载 WebView 的 1×1 窗口 -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+    <application
+        android:name=".LinuxDoApp"
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="Linux.do 助手"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:supportsRtl="true"
+        android:usesCleartextTraffic="false"
+        android:theme="@style/Theme.LinuxDoAssistant">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode|density|smallestScreenSize"
+            android:launchMode="singleTask"
+            android:theme="@style/Theme.LinuxDoAssistant">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".service.AutomationService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <!--
+                API 34+ 要求 specialUse 类型必须说明用途。
+                本服务的用途：在用户离开应用后保持 WebView 可见并持续执行用户主动发起的
+                浏览自动化任务；Android 会冻结后台 WebView 的渲染与 JS 计时器，
+                没有前台服务 + 可见窗口，任务必然中断。
+            -->
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps a user-initiated web automation session alive; Android suspends background WebView rendering and JS timers." />
+        </service>
+    </application>
+
+</manifest>

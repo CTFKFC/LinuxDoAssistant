@@ -1,0 +1,86 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 配置 JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: 配置 Gradle 缓存
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: 静态检查
+        run: ./gradlew lintDebug
+
+      - name: 单元测试
+        run: ./gradlew testDebugUnitTest
+
+      - name: 构建 Debug APK
+        run: ./gradlew :app:assembleDebug
+
+      # Release 走 R8 混淆。CI runner 内存充足，可以开。
+      # 未配置签名密钥时会自动回退 debug 签名，构建不会失败。
+      - name: 构建 Release APK
+        run: ./gradlew :app:assembleRelease -Plinuxdo.minify=true
+
+      - name: 上传 Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: app/build/outputs/apk/debug/*.apk
+
+      - name: 上传 Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: app/build/outputs/apk/release/*.apk
+
+      - name: 上传检查报告
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports
+          path: |
+            app/build/reports/**
+            */build/reports/tests/**
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - name: 下载构建产物
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: 创建 Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*.apk
+          generate_release_notes: true
+          body: |
+            > ⚠️ 本工具通过自动化产生浏览、点赞、回复行为，违反绝大多数论坛的服务条款。
+            > 自动点赞与自动回复默认关闭。账号被封禁等一切后果由使用者自行承担，仅供学习交流。
+
+            APK 使用 **debug 签名**（仓库未配置正式密钥）。
+            如需正式签名，请参考 README「Release 包与签名」自行构建。
